@@ -1,0 +1,36 @@
+{
+  "name": "swagger2tf",
+  "version": "0.1.0",
+  "description": "Convert Swagger files to Terraform API Gateway configurations",
+  "main": "index.js",
+  "bin": {
+    "swagger2tf": "cli.js"
+  },
+  "scripts": {
+    "test": "js-yaml schema.yml | swagger2tf > schema.json.tf; terraform plan; rm schema.json.tf"
+  },
+  "author": "Marcus Zanona <m@zanona.com>",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zanona/swagger2tf.git"
+  },
+  "keywords": [
+    "swagger",
+    "terraform",
+    "automation",
+    "infrastructure",
+    "json-schema",
+    "schema",
+    "api-gateway",
+    "aws",
+    "amazon",
+    "lambda"
+  ],
+  "bugs": {
+    "url": "https://github.com/zanona/swagger2tf/issues"
+  },
+  "homepage": "https://github.com/zanona/swagger2tf#readme"
+}

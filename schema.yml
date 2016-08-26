@@ -1,0 +1,81 @@
+swagger:  '2.0'
+info:     { title: My API, version: 1.0.0-rc1 }
+host:     XXXXXXXXXX.execute-api.eu-west-1.amazonaws.com
+basePath: /prod
+schemes:  [https]
+consumes: [application/json]
+produces: [application/json]
+responses: &responses
+  200: { description: OK }
+  400: { description: Bad request }
+parameters:
+  type: { name: type, in: path, type: string, required: true }
+  id:   { name: id,   in: path, type: string, required: true }
+
+x-amazon-apigateway-integration: { $ref: '#/x-integrations/lambda-core' }
+
+paths:
+  /auth:
+    parameters:
+      - { name: provider, in: query, type: string, required: true }
+      - { name: code,     in: query, type: string, required: true }
+    get:
+      responses:
+        302:
+          description: '302 Redirect'
+          headers:
+            Set-Cookie: { type: string }
+            Location:   { type: string }
+      x-amazon-apigateway-integration: { $ref: '#/x-integrations/lambda-auth' }
+  /{type}:
+    parameters: [$ref: '#/parameters/type']
+    get:   { responses: *responses }
+    post:  { responses: *responses }
+  /{type}/{id}:
+    parameters: [$ref: '#/parameters/type', $ref: '#/parameters/id']
+    get:    { responses: *responses }
+    put:    { responses: *responses }
+    delete: { responses: *responses }
+
+x-integrations:
+  lambda-core: &AWS
+    type: aws
+    uri: 'arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:XXXXXXXXXXXX:function:api/invocations'
+    httpMethod: POST
+    requestTemplates:
+      application/json: >-
+        {
+          "url": "$context.resourcePath",
+          "method": "$context.httpMethod",
+          #foreach($type in $input.params().keySet())
+          "$type": {
+            #set($items = $input.params().get($type))
+            #foreach($key in $items.keySet())
+              #set($value = $items.get($key))
+              "$key": "$util.escapeJavaScript($value)"
+              #if($foreach.hasNext),#end
+            #end
+          },
+          #end
+          "body": $input.json('$')
+        }
+    passthroughBehavior: when_no_templates
+    responses:
+      default: { statusCode: 200 } #passthrough implied
+      '(.|\n)*BAD(.|\n)*':
+        statusCode: 400
+        responseTemplates:
+          application/json: '$input.path("errorMessage")'
+      '(.|\n)*INTERNAL(.|\n)*':
+        statusCode: 500
+        responseTemplates:
+          application/json: '$input.path("errorMessage")'
+  lambda-auth:
+    <<: *AWS
+    uri: 'arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:XXXXXXXXXXXX:function:oauth/invocations'
+    responses:
+      default:
+        statusCode: 302
+        responseParameters:
+          method.response.header.Set-Cookie: integration.response.body.setCookie
+          method.response.header.Location: integration.response.body.location
