@@ -51,7 +51,6 @@ function generateCORSResource() {
     responses: {
       200: {
         headers: {
-          'Access-Control-Allow-Origin':  { type: 'string' },
           'Access-Control-Allow-Methods': { type: 'string' },
           'Access-Control-Allow-Headers': { type: 'string' }
         }
@@ -64,8 +63,7 @@ function generateCORSResource() {
           statusCode: 200,
           responseParameters: {
             'method.response.header.Access-Control-Allow-Methods': "'GET,OPTIONS'",
-            'method.response.header.Access-Control-Allow-Headers': `'${allowedHeaders.join(',')}'`,
-            'method.response.header.Access-Control-Allow-Origin': "'*'"
+            'method.response.header.Access-Control-Allow-Headers': `'${allowedHeaders.join(',')}'`
           }
         }
       },
@@ -85,7 +83,7 @@ function runParser(schema, opts) {
 
     this.emit('resource', resourceName, path, paths[path]);
 
-    if (opts.enableCORS) paths[path]['options'] = generateCORSResource();
+    if (opts.enableCORS) paths[path]['options'] = generateCORSResource(opts.allowedOrigin);
 
     for (const method in pathItem) {
       if (!/^(get|post|put|patch|delete|options)$/.test(method)) continue;
@@ -111,6 +109,8 @@ function runParser(schema, opts) {
           const r = responseItem;
           r.headers = r.headers || {};
           r.headers['Access-Control-Allow-Origin'] = { type: 'string' };
+          r.headers['Access-Control-Allow-Credentials'] = { type: 'string' };
+
         }
         this.emit('response', resourceName, method, statusCode, responseItem);
 
@@ -121,7 +121,8 @@ function runParser(schema, opts) {
           if (opts.enableCORS) {
             const r = integrationResponseItem;
             r.responseParameters = r.responseParameters || {};
-            r.responseParameters['method.response.header.Access-Control-Allow-Origin'] = "'*'";
+            r.responseParameters['method.response.header.Access-Control-Allow-Origin'] = `'${opts.allowedOrigin}'`;
+            r.responseParameters['method.response.header.Access-Control-Allow-Credentials'] = "'true'";
           }
           this.emit('integrationResponse', resourceName, method, statusCode, integrationResponseItem);
         }

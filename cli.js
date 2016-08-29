@@ -1,6 +1,16 @@
 #!/usr/bin/env node
 var run = require('./'),
-    input = '';
+    input = '',
+    opts = {};
+
+process.argv.forEach((opt) => {
+  if (!opt.match(/^-+/)) return;
+  const kv = opt.split('='),
+        k = kv[0].replace(/-+/, '').trim(),
+        v = kv[1] ? kv[1].trim() : true;
+  opts[k] = v;
+});
+
 process.stdin.setEncoding('utf8');
 process.stdin.on('readable', () => {
   const chunk = process.stdin.read();
@@ -8,7 +18,8 @@ process.stdin.on('readable', () => {
 });
 process.stdin.on('end', () => {
   const parse = run(JSON.parse(input), {
-    enableCORS: process.argv.indexOf('--no-cors') < 0
+    allowedOrigin: opts.origin,
+    enableCORS: !opts['no-cors']
   });
   parse.then((output) => {
     console.log(JSON.stringify(output, null, 2));
