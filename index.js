@@ -115,7 +115,7 @@ function runParser(schema, opts) {
         this.emit('response', resourceName, method, statusCode, responseItem);
 
         /*eslint max-depth: [1,5]*/
-        if (integrationItem.responses) {
+        if (integrationItem && integrationItem.responses) {
           const integrationResponseItem = getIntegrationResponseForStatusCode(integrationItem.responses, statusCode);
           if (!integrationResponseItem) continue;
           if (opts.enableCORS) {

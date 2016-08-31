@@ -7,12 +7,14 @@
     "swagger2tf": "cli.js"
   },
   "scripts": {
-    "test": "js-yaml schema.yml | swagger2tf > schema.json.tf; terraform plan; rm schema.json.tf"
+    "test": "jsderef schema.yml | swagger2tf"
   },
   "author": "Marcus Zanona <m@zanona.com>",
   "license": "ISC",
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "jsderef": "github:zanona/jsderef#master"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zanona/swagger2tf.git"
