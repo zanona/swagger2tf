@@ -73,6 +73,17 @@ function generateCORSResource() {
   };
 }
 
+function findMissingParentPaths(path, paths) {
+  const missing = [],
+        routes = path.split('/').filter((i) => i);
+  let currentPath = '';
+  for (const route of routes) {
+    currentPath += '/' + route;
+    if (!paths[currentPath]) missing.push({ resourceName: normalizeResourceName(route), path: route});
+  }
+  return missing;
+}
+
 function runParser(schema, opts) {
   opts = Object.assign({}, opts);
   const paths = schema.paths;
@@ -80,6 +91,12 @@ function runParser(schema, opts) {
   for (const path in paths) {
     const resourceName = normalizeResourceName(path),
           pathItem = paths[path];
+
+    // AUTO CREATE PARENT RESOURCES IN CASE NOT PRESENT I.E: /UTILS/LOCATIONS
+    // WHERE /UTILS IS NOT CREATED
+    findMissingParentPaths(path, paths).forEach((item) => {
+      this.emit('resource', item.resourceName, item.path);
+    });
 
     this.emit('resource', resourceName, path, paths[path]);
 
