@@ -11,6 +11,19 @@ responses: &responses
 parameters:
   type: { name: type, in: path, type: string, required: true }
   id:   { name: id,   in: path, type: string, required: true }
+securityDefinitions:
+  default:
+    type: apiKey
+    name: Authorization
+    in: header
+    x-amazon-apigateway-authtype: custom
+    x-amazon-apigateway-authorizer:
+      authorizerUri: arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/${aws_lambda_function.authorizer.arn}/invocations
+      authorizerCredentials: ${aws_iam_role.apigateway.arn}
+      authorizerResultTtlInSeconds: 300
+      identityValidationExpression: ^Bearer .{10,}
+      type: token
+security: [default: []]
 
 x-amazon-apigateway-integration: { $ref: '#/x-integrations/lambda-core' }
 
@@ -20,6 +33,7 @@ paths:
       - { name: provider, in: query, type: string, required: true }
       - { name: code,     in: query, type: string, required: true }
     get:
+      security: []
       responses:
         302:
           description: '302 Redirect'

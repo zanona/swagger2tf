@@ -38,6 +38,14 @@ function getIntegrationResponseForStatusCode(responses, statusCode) {
     return responses[key];
   }
 }
+function getSecurityDefinition(security, definitions) {
+  security = security && security[0];
+  if (!security || !definitions) return;
+  const name = Object.keys(security)[0];
+  security = definitions[name];
+  security.resourceName = name;
+  return security;
+}
 
 function generateCORSResource() {
   const allowedHeaders = [
@@ -86,7 +94,15 @@ function findMissingParentPaths(path, paths) {
 
 function runParser(schema, opts) {
   opts = Object.assign({}, opts);
-  const paths = schema.paths;
+  const paths = schema.paths,
+        securityDefinitions = schema.securityDefinitions;
+
+  for (const definitionName in securityDefinitions) {
+    const definition = securityDefinitions[definitionName],
+          authorizer = definition[opts.authorizerKey];
+    authorizer.identitySource = `${definition.in}.${definition.name}`;
+    if (definition) this.emit('authorizer', definitionName, authorizer);
+  }
 
   for (const path in paths) {
     const resourceName = normalizeResourceName(path),
@@ -107,10 +123,11 @@ function runParser(schema, opts) {
 
       const methodItem = pathItem[method],
             iKey = opts.integrationKey,
-            integrationItem = methodItem[iKey] || pathItem[iKey] || schema[iKey];
+            integrationItem = methodItem[iKey] || pathItem[iKey] || schema[iKey],
+            security = getSecurityDefinition(methodItem.security || schema.security, schema.securityDefinitions);
 
       mergeParameters(methodItem, pathItem.parameters);
-      this.emit('method', resourceName, method, methodItem);
+      this.emit('method', resourceName, method, methodItem, security);
 
       if (integrationItem) {
         const copyIntegrationItem = Object.assign({}, integrationItem);
@@ -138,7 +155,7 @@ function runParser(schema, opts) {
           if (opts.enableCORS) {
             const r = integrationResponseItem;
             r.responseParameters = r.responseParameters || {};
-            r.responseParameters['method.response.header.Access-Control-Allow-Origin'] = `'${opts.allowedOrigin}'`;
+            r.responseParameters['method.response.header.Access-Control-Allow-Origin'] = `'${opts.allowedOrigin || '*'}'`;
             r.responseParameters['method.response.header.Access-Control-Allow-Credentials'] = "'true'";
           }
           this.emit('integrationResponse', resourceName, method, statusCode, integrationResponseItem);
@@ -158,13 +175,16 @@ module.exports = (schema, opts) => {
 
   opts = Object.assign({
     enableCORS: true,
-    integrationKey: 'x-amazon-apigateway-integration'
+    integrationKey: 'x-amazon-apigateway-integration',
+    authorizerKey: 'x-amazon-apigateway-authorizer',
+    authTypeKey: 'x-amazon-apigateway-authtype'
   }, opts);
 
   const PREFIX    = 'aws_api_gateway',
         API_NAME  = 'core',
         APIS      = `${PREFIX}_rest_api`,
         API_ID    = `\${${APIS}.${API_NAME}.id}`,
+        AUTHORIZERS = `${PREFIX}_authorizer`,
         RESOURCES = `${PREFIX}_resource`,
         METHODS   = `${PREFIX}_method`,
         RESPONSES = `${PREFIX}_method_response`,
@@ -172,6 +192,7 @@ module.exports = (schema, opts) => {
         INTEGRATION_RESPONSES = `${PREFIX}_integration_response`,
         base = {
           [APIS] :     { [API_NAME]: { name: API_NAME, description: schema.info.title }},
+          [AUTHORIZERS]: {},
           [RESOURCES]: {},
           [METHODS]:   {},
           [RESPONSES]: {},
@@ -190,6 +211,17 @@ module.exports = (schema, opts) => {
   }
 
   parser
+    .on('authorizer', (resourceName, authorizer) => {
+      base[AUTHORIZERS][resourceName] = {
+        authorizer_uri: authorizer.authorizerUri,
+        name: resourceName,
+        rest_api_id: API_ID,
+        identity_source: `method.request.${authorizer.identitySource}`,
+        authorizer_credentials: authorizer.authorizerCredentials,
+        authorizer_result_ttl_in_seconds: authorizer.authorizerResultTtlInSeconds,
+        identity_validation_expression: authorizer.identityValidationExpression
+      };
+    })
     .on('resource', (resourceName, path) => {
       base[RESOURCES][resourceName] = {
         rest_api_id: API_ID ,
@@ -197,12 +229,20 @@ module.exports = (schema, opts) => {
         path_part: path.split('/').pop()
       };
     })
-    .on('method', (resourceName, method, resourceItem) => {
+    .on('method', (resourceName, method, resourceItem, securityDefinition) => {
+      let security = {};
+      if (method !== 'options' && securityDefinition) {
+        security = {
+          authorizer_id: `\${${AUTHORIZERS}.${securityDefinition.resourceName}.id}`,
+          authorization: securityDefinition[opts.authTypeKey]
+        };
+      }
       base[METHODS][`${method}_${resourceName}`] = {
         rest_api_id: API_ID,
         resource_id: `\${${RESOURCES}.${resourceName}.id}`,
         http_method: method.toUpperCase(),
-        authorization: 'NONE',
+        authorization: (security.authorization || 'none').toUpperCase(),
+        authorizer_id: security.authorizer_id,
         request_parameters: generateMethodParams(resourceItem.parameters)
       };
     })
