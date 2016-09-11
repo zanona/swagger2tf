@@ -70,7 +70,7 @@ function generateCORSResource() {
         default: {
           statusCode: 200,
           responseParameters: {
-            'method.response.header.Access-Control-Allow-Methods': "'GET,OPTIONS'",
+            'method.response.header.Access-Control-Allow-Methods': "'GET,POST,PUT,PATCH,DELETE,OPTIONS'",
             'method.response.header.Access-Control-Allow-Headers': `'${allowedHeaders.join(',')}'`
           }
         }
